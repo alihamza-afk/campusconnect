@@ -1,0 +1,98 @@
+:root {
+  --bg: #e3e9ec;
+  --board: #2e5e5a;
+  --ink: #1b2340;
+  --muted: #5a6478;
+  --paper: #ffffff;
+  --tape: #f2c14e;
+  --sell: #2e5e5a;
+  --lend: #4c5bd4;
+  --lost: #d9482b;
+  --found: #3e8e41;
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: 1rem; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: "DM Sans", system-ui, sans-serif; line-height: 1.5;
+}
+h1, h2, .card h3 { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; }
+
+.top {
+  display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+  padding: 1rem clamp(1rem, 4vw, 3rem); background: var(--board); color: #fff;
+}
+.brand { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+#search {
+  flex: 1 1 260px; padding: .7rem 1rem; border: 2px solid transparent; border-radius: 8px;
+  font: inherit; background: #fff; color: var(--ink);
+}
+#search:focus-visible, .chip:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--tape); outline-offset: 2px;
+}
+
+.btn {
+  font: inherit; font-weight: 700; padding: .65rem 1.1rem; border-radius: 8px; cursor: pointer;
+  border: 2px solid var(--ink); background: #fff; color: var(--ink);
+}
+.btn.primary { background: var(--tape); border-color: var(--tape); }
+.btn.danger { border-color: var(--lost); color: var(--lost); }
+
+.filters {
+  display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
+  padding: 1rem clamp(1rem, 4vw, 3rem) 0;
+}
+.chip {
+  font: inherit; padding: .4rem .9rem; border-radius: 999px; cursor: pointer;
+  border: 2px solid var(--ink); background: transparent; color: var(--ink);
+}
+.chip.active { background: var(--ink); color: #fff; }
+.sort { margin-left: auto; font-size: .9rem; color: var(--muted); display: flex; gap: .5rem; align-items: center; }
+.sort select { font: inherit; padding: .3rem; border-radius: 6px; border: 1px solid var(--muted); }
+
+.status { padding: .5rem clamp(1rem, 4vw, 3rem) 0; margin: 0; color: var(--muted); min-height: 1.6rem; }
+
+.board {
+  display: grid; gap: 1.6rem 1.2rem; padding: 1.2rem clamp(1rem, 4vw, 3rem) 3rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+.card {
+  position: relative; background: var(--paper); padding: 1.6rem 1.1rem 1rem;
+  border-left: 6px solid var(--accent, var(--sell)); border-radius: 4px;
+  box-shadow: 0 2px 0 rgba(27, 35, 64, .18);
+  display: flex; flex-direction: column; gap: .35rem;
+}
+.card::before {                      /* strip of tape holding the notice to the board */
+  content: ""; position: absolute; top: -10px; left: 50%; width: 70px; height: 20px;
+  background: var(--tape); opacity: .85; transform: translateX(-50%) rotate(-2deg);
+}
+.card:nth-child(3n+2)::before { transform: translateX(-50%) rotate(3deg); }
+.card[data-type="sell"]  { --accent: var(--sell); }
+.card[data-type="lend"]  { --accent: var(--lend); }
+.card[data-type="lost"]  { --accent: var(--lost); }
+.card[data-type="found"] { --accent: var(--found); }
+
+.tag { font-size: .8rem; font-weight: 700; color: var(--accent); }
+.card h3 { margin: 0; font-size: 1.15rem; line-height: 1.25; }
+.card p { margin: 0; color: var(--muted); font-size: .93rem; }
+.price { font-size: 1.4rem; font-weight: 800; font-family: "Bricolage Grotesque", sans-serif; }
+.meta { font-size: .85rem; color: var(--muted); margin-top: auto; padding-top: .6rem; border-top: 1px dashed #c3cad4; }
+.card .btn { margin-top: .5rem; padding: .4rem .8rem; font-size: .9rem; align-self: flex-start; }
+
+.empty { grid-column: 1 / -1; padding: 2rem; border: 2px dashed var(--muted); border-radius: 8px; text-align: center; color: var(--muted); }
+
+dialog { border: none; border-radius: 10px; padding: 0; width: min(520px, 92vw); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+dialog::backdrop { background: rgba(27, 35, 64, .55); }
+#postForm { padding: 1.5rem; display: grid; gap: .9rem; }
+#postForm h2 { margin: 0; }
+#postForm label { display: grid; gap: .3rem; font-weight: 500; font-size: .92rem; }
+#postForm input, #postForm select, #postForm textarea {
+  font: inherit; padding: .55rem .7rem; border: 1px solid #9aa3b2; border-radius: 6px;
+}
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+.actions { display: flex; justify-content: flex-end; gap: .6rem; }
+.error { color: var(--lost); margin: 0; min-height: 1.2rem; font-size: .9rem; }
+
+@media (max-width: 520px) { .row { grid-template-columns: 1fr; } .sort { margin-left: 0; } }
+@media (prefers-reduced-motion: no-preference) { .btn, .chip { transition: background .15s; } }

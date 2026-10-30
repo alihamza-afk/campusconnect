@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampusConnect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1 class="brand">CampusConnect</h1>
+    <input id="search" type="search" placeholder="Search the board: calculator, cycle, wallet…" aria-label="Search items">
+    <button id="openPost" class="btn primary">Post a notice</button>
+  </header>
+
+  <nav class="filters" aria-label="Filter notices">
+    <button class="chip active" data-type="">Everything</button>
+    <button class="chip" data-type="sell">For sale</button>
+    <button class="chip" data-type="lend">To borrow</button>
+    <button class="chip" data-type="lost">Lost</button>
+    <button class="chip" data-type="found">Found</button>
+    <label class="sort">Sort
+      <select id="sort">
+        <option value="new">Newest first</option>
+        <option value="cheap">Price: low to high</option>
+        <option value="dear">Price: high to low</option>
+      </select>
+    </label>
+  </nav>
+
+  <p id="status" class="status" role="status"></p>
+  <main id="board" class="board"></main>
+
+  <dialog id="postDialog">
+    <form id="postForm" method="dialog">
+      <h2>Post a notice</h2>
+      <label>What is it for?
+        <select name="type" required>
+          <option value="sell">Selling an item</option>
+          <option value="lend">Lending an item</option>
+          <option value="lost">I lost something</option>
+          <option value="found">I found something</option>
+        </select>
+      </label>
+      <label>Title <input name="title" required maxlength="60" placeholder="e.g. Drafting board A2"></label>
+      <label>Details <textarea name="description" rows="3" maxlength="200" placeholder="Condition, return date, what to ask for…"></textarea></label>
+      <div class="row">
+        <label>Category
+          <select name="category">
+            <option>Books</option><option>Electronics</option><option>Stationery</option>
+            <option>Clothing</option><option>Cycle</option><option>ID or wallet</option><option>Other</option>
+          </select>
+        </label>
+        <label id="priceField">Price (₹) <input name="price" type="number" min="0" value="0"></label>
+      </div>
+      <label>Where on campus <input name="location" placeholder="Library, Hostel C, Canteen…"></label>
+      <label>Your name <input name="owner" required maxlength="30"></label>
+      <p id="formError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="cancelPost" class="btn">Cancel</button>
+        <button type="submit" class="btn primary">Pin to board</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
