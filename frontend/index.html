@@ -12,27 +12,75 @@
 <body>
   <header class="top">
     <h1 class="brand">CampusConnect</h1>
-    <input id="search" type="search" placeholder="Search the board: calculator, cycle, wallet…" aria-label="Search items">
-    <button id="openPost" class="btn primary">Post a notice</button>
+    <div id="headerApp" class="header-app" hidden>
+      <input id="search" type="search" placeholder="Search the board: calculator, cycle, wallet…" aria-label="Search items">
+      <button id="openPost" class="btn primary">Post a notice</button>
+      <div class="who">
+        <span id="whoName"></span>
+        <span id="whoRole" class="role-badge" hidden>Admin</span>
+        <button id="logout" class="btn ghost">Log out</button>
+      </div>
+    </div>
   </header>
 
-  <nav class="filters" aria-label="Filter notices">
-    <button class="chip active" data-type="">Everything</button>
-    <button class="chip" data-type="sell">For sale</button>
-    <button class="chip" data-type="lend">To borrow</button>
-    <button class="chip" data-type="lost">Lost</button>
-    <button class="chip" data-type="found">Found</button>
-    <label class="sort">Sort
-      <select id="sort">
-        <option value="new">Newest first</option>
-        <option value="cheap">Price: low to high</option>
-        <option value="dear">Price: high to low</option>
-      </select>
-    </label>
-  </nav>
+  <!-- Shown when nobody is logged in -->
+  <main id="authView" class="auth" hidden>
+    <section class="auth-card" aria-labelledby="authTitle">
+      <h2 id="authTitle">Welcome to the campus board</h2>
+      <p class="auth-lead">Log in to see notices, post your own, and mark them as sold, returned or claimed.</p>
+      <div class="auth-tabs" role="group" aria-label="Choose">
+        <button type="button" class="chip active" data-auth="login" aria-pressed="true">Log in</button>
+        <button type="button" class="chip" data-auth="register" aria-pressed="false">Create account</button>
+      </div>
 
-  <p id="status" class="status" role="status"></p>
-  <main id="board" class="board"></main>
+      <form id="loginForm" class="auth-form">
+        <label>College email <input name="email" type="email" required autocomplete="username" maxlength="100"></label>
+        <label>Password <input name="password" type="password" required autocomplete="current-password" maxlength="128"></label>
+        <button type="submit" class="btn primary">Log in</button>
+      </form>
+
+      <form id="registerForm" class="auth-form" hidden>
+        <label>Your name <input name="name" required autocomplete="name" maxlength="40"></label>
+        <label>College email <input name="email" type="email" required autocomplete="username" maxlength="100"></label>
+        <label>Password <small>(at least 8 characters)</small>
+          <input name="password" type="password" required autocomplete="new-password" minlength="8" maxlength="128">
+        </label>
+        <button type="submit" class="btn primary">Create account</button>
+      </form>
+
+      <p id="authError" class="error" role="alert"></p>
+    </section>
+  </main>
+
+  <!-- Shown when the server cannot be reached -->
+  <main id="downView" class="auth" hidden>
+    <section class="auth-card" aria-labelledby="downTitle">
+      <h2 id="downTitle">The board is offline</h2>
+      <p class="auth-lead">This page can't reach the CampusConnect server. Start it with <code>./campusconnect</code> in the backend folder, then open <strong>http://localhost:8080</strong> (not the index.html file).</p>
+      <button type="button" id="retry" class="btn primary">Try again</button>
+    </section>
+  </main>
+
+  <!-- Shown when logged in -->
+  <div id="appView" hidden>
+    <nav class="filters" aria-label="Filter notices">
+      <button class="chip active" data-type="">Everything</button>
+      <button class="chip" data-type="sell">For sale</button>
+      <button class="chip" data-type="lend">To borrow</button>
+      <button class="chip" data-type="lost">Lost</button>
+      <button class="chip" data-type="found">Found</button>
+      <label class="sort">Sort
+        <select id="sort">
+          <option value="new">Newest first</option>
+          <option value="cheap">Price: low to high</option>
+          <option value="dear">Price: high to low</option>
+        </select>
+      </label>
+    </nav>
+
+    <p id="status" class="status" role="status"></p>
+    <main id="board" class="board"></main>
+  </div>
 
   <dialog id="postDialog">
     <form id="postForm" method="dialog">
@@ -54,10 +102,10 @@
             <option>Clothing</option><option>Cycle</option><option>ID or wallet</option><option>Other</option>
           </select>
         </label>
-        <label id="priceField">Price (₹) <input name="price" type="number" min="0" value="0"></label>
+        <label id="priceField">Price (₹) <input name="price" type="number" min="0" max="1000000" value="0"></label>
       </div>
-      <label>Where on campus <input name="location" placeholder="Library, Hostel C, Canteen…"></label>
-      <label>Your name <input name="owner" required maxlength="30"></label>
+      <label>Where on campus <input name="location" maxlength="60" placeholder="Library, Hostel C, Canteen…"></label>
+      <p class="hint">Posted as <strong id="postAs"></strong>. Don't include phone numbers or ID numbers.</p>
       <p id="formError" class="error" role="alert"></p>
       <div class="actions">
         <button type="button" id="cancelPost" class="btn">Cancel</button>

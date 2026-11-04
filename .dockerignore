@@ -1,0 +1,9 @@
+# Never copy local data (it contains password hashes) or local builds into the image.
+backend/data/
+backend/campusconnect
+backend/httplib.h
+backend/json.hpp
+.git/
+.claude/
+.idea/
+.DS_Store

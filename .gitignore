@@ -3,3 +3,5 @@
 backend/campusconnect
 backend/httplib.h
 backend/json.hpp
+# Saved items and accounts (password hashes). Never commit this.
+backend/data/

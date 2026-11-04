@@ -1,53 +1,62 @@
-// CampusConnect frontend. Talks to the C++ backend; if it is not running,
-// falls back to in-browser sample data so the UI can still be demoed.
-const API = location.protocol === "file:" ? "http://localhost:8080/api" : "/api";
+// CampusConnect frontend. Every notice comes from the C++ backend, which saves
+// them to disk. There is no sample or demo data in the browser.
+//
+// Security note: hiding a button here is only for convenience. The server checks
+// who is logged in, and whether they own the notice, on every request.
+const API = "/api";
 const TYPE_LABEL = { sell: "For sale", lend: "To borrow", lost: "Lost", found: "Found" };
 const ACTION_LABEL = { sell: "Mark as sold", lend: "Mark as returned", lost: "Mark as found", found: "Mark as claimed" };
 
-const state = { q: "", type: "", sort: "new", offline: false };
-let offlineItems = [
-  { id: 1, type: "sell", title: "Engineering Mathematics Vol 2", description: "Barely used, no markings", category: "Books", location: "Hostel B", owner: "Riya", price: 250, createdAt: 3 },
-  { id: 2, type: "lend", title: "Scientific Calculator fx-991", description: "Lend for exams, return in 3 days", category: "Electronics", location: "Library", owner: "Aman", price: 0, createdAt: 2 },
-  { id: 3, type: "lost", title: "Black wallet", description: "Lost near canteen, has college ID", category: "ID or wallet", location: "Canteen", owner: "Kabir", price: 0, createdAt: 1 },
-];
+const state = { q: "", type: "", sort: "new", user: null };
 
 const $ = (s) => document.querySelector(s);
 const board = $("#board"), statusEl = $("#status"), dialog = $("#postDialog"), form = $("#postForm");
 
+// ---------- talking to the server ----------
+class ApiError extends Error {
+  constructor(message, status) { super(message); this.status = status; }
+}
+
+// status 0 = the request never reached the server (it is stopped, or the network is down).
+const UNREACHABLE = "Can't reach the CampusConnect server. Check that it is still running, then try again.";
+
+async function api(path, { method = "GET", body } = {}) {
+  let res;
+  try {
+    res = await fetch(API + path, {
+      method,
+      credentials: "same-origin",   // send the session cookie
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new ApiError(UNREACHABLE, 0);
+  }
+  let data = null;
+  try { data = await res.json(); } catch { /* empty or non-JSON body */ }
+  if (!res.ok) throw new ApiError((data && data.error) || `Request failed (${res.status})`, res.status);
+  return data;
+}
+
+// Any request that comes back 401 means the session expired or was logged out elsewhere.
+function handleError(err) {
+  if (err.status === 401) {
+    state.user = null;
+    showAuth("Your session has ended. Please log in again.");
+    return true;
+  }
+  return false;
+}
+
 // ---------- data layer ----------
 async function fetchItems() {
   const params = new URLSearchParams({ q: state.q, type: state.type, sort: state.sort });
-  try {
-    const res = await fetch(`${API}/items?${params}`);
-    if (!res.ok) throw new Error(res.status);
-    state.offline = false;
-    return await res.json();
-  } catch {
-    state.offline = true;
-    const words = state.q.toLowerCase().split(/\s+/).filter(Boolean);
-    let list = offlineItems.filter((i) =>
-      (!state.type || i.type === state.type) &&
-      words.every((w) => i.title.toLowerCase().split(/\s+/).some((t) => t.startsWith(w))));
-    if (state.sort === "cheap") list.sort((a, b) => a.price - b.price);
-    else if (state.sort === "dear") list.sort((a, b) => b.price - a.price);
-    else list.sort((a, b) => b.createdAt - a.createdAt);
-    return list;
-  }
+  return api(`/items?${params}`);
 }
 
-async function createItem(data) {
-  if (!state.offline) {
-    const res = await fetch(`${API}/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
-    if (!res.ok) throw new Error((await res.json()).error || "Could not post");
-    return;
-  }
-  offlineItems.push({ ...data, id: Date.now(), createdAt: Date.now() });
-}
-
-async function closeItem(id) {
-  if (!state.offline) await fetch(`${API}/items/${id}/close`, { method: "POST" });
-  else offlineItems = offlineItems.filter((i) => i.id !== id);
-}
+const createItem = (data) => api("/items", { method: "POST", body: data });
+const closeItem = (id) => api(`/items/${id}/close`, { method: "POST" });
+const deleteItem = (id) => api(`/items/${id}`, { method: "DELETE" });
 
 // ---------- rendering ----------
 function timeAgo(ts) {
@@ -77,20 +86,63 @@ function cardEl(item) {
   if (item.description) {
     const d = document.createElement("p"); d.textContent = item.description; el.append(d);
   }
+  const mine = state.user && item.ownerId === state.user.id;
   const meta = document.createElement("div");
   meta.className = "meta";
-  meta.textContent = `${item.owner}${item.location ? " at " + item.location : ""} · ${timeAgo(item.createdAt)}`;
+  meta.textContent = `${mine ? "You" : item.owner}${item.location ? " at " + item.location : ""} · ${timeAgo(item.createdAt)}`;
   el.append(meta);
 
-  const btn = document.createElement("button");
-  btn.className = "btn"; btn.textContent = ACTION_LABEL[item.type];
-  btn.onclick = async () => { await closeItem(item.id); render(); };
-  el.append(btn);
+  // Only the poster or an admin gets these buttons (the server enforces the same rule).
+  if (item.canClose) {
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+
+    const btn = document.createElement("button");
+    btn.className = "btn"; btn.textContent = ACTION_LABEL[item.type];
+    btn.onclick = () => act(() => closeItem(item.id));
+
+    const del = document.createElement("button");
+    del.className = "btn danger"; del.textContent = "Delete";
+    del.onclick = () => {
+      if (confirm(`Delete "${item.title}"? This cannot be undone.`)) act(() => deleteItem(item.id));
+    };
+    actions.append(btn, del);
+
+    if (!mine && state.user && state.user.role === "admin") {
+      const note = document.createElement("span");
+      note.className = "admin-note"; note.textContent = "as admin";
+      actions.append(note);
+    }
+    el.append(actions);
+  }
   return el;
 }
 
+async function act(fn) {
+  try {
+    await fn();
+  } catch (err) {
+    if (handleError(err)) return;
+    statusEl.textContent = err.message;
+    return;
+  }
+  render();
+}
+
 async function render() {
-  const items = await fetchItems();
+  let items;
+  try {
+    items = await fetchItems();
+  } catch (err) {
+    if (handleError(err)) return;
+    // Don't leave the previous cards up: they would no longer match the chosen filter or sort.
+    const e = document.createElement("div");
+    e.className = "empty error-box";
+    e.textContent = err.message;
+    board.replaceChildren(e);
+    statusEl.textContent = "";
+    return;
+  }
   board.replaceChildren();
   if (!items.length) {
     const e = document.createElement("div");
@@ -98,20 +150,78 @@ async function render() {
     e.textContent = state.q || state.type ? "Nothing matches yet. Try another word or post a notice." : "The board is empty. Post the first notice.";
     board.append(e);
   } else items.forEach((i) => board.append(cardEl(i)));
-  statusEl.textContent = state.offline
-    ? "Backend not reachable. Showing sample notices stored in this browser."
-    : `${items.length} notice${items.length === 1 ? "" : "s"} on the board`;
+  statusEl.textContent = `${items.length} notice${items.length === 1 ? "" : "s"} on the board`;
 }
 
-// ---------- events ----------
+// ---------- switching between the login screen and the board ----------
+function showAuth(message = "") {
+  $("#downView").hidden = true;
+  $("#headerApp").hidden = true;
+  $("#appView").hidden = true;
+  $("#authView").hidden = false;
+  $("#authError").textContent = message;
+  if (dialog.open) dialog.close();
+}
+
+function showApp() {
+  $("#downView").hidden = true;
+  $("#authView").hidden = true;
+  $("#headerApp").hidden = false;
+  $("#appView").hidden = false;
+  const u = state.user;
+  $("#whoName").textContent = u.name;
+  $("#whoRole").hidden = u.role !== "admin";
+  $("#postAs").textContent = u.name;
+  render();
+}
+
+function switchAuthTab(which) {
+  document.querySelectorAll("[data-auth]").forEach((b) => {
+    const on = b.dataset.auth === which;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on);
+  });
+  $("#loginForm").hidden = which !== "login";
+  $("#registerForm").hidden = which !== "register";
+  $("#authError").textContent = "";
+}
+
+document.querySelectorAll("[data-auth]").forEach((b) => b.addEventListener("click", () => switchAuthTab(b.dataset.auth)));
+
+async function submitAuth(e, path) {
+  e.preventDefault();
+  const formEl = e.target;
+  const submit = formEl.querySelector("button[type=submit]");
+  submit.disabled = true;
+  try {
+    state.user = await api(path, { method: "POST", body: Object.fromEntries(new FormData(formEl)) });
+    formEl.reset();
+    showApp();
+  } catch (err) {
+    $("#authError").textContent = err.message;
+  } finally {
+    submit.disabled = false;
+  }
+}
+$("#loginForm").addEventListener("submit", (e) => submitAuth(e, "/login"));
+$("#registerForm").addEventListener("submit", (e) => submitAuth(e, "/register"));
+
+$("#logout").onclick = async () => {
+  try { await api("/logout", { method: "POST" }); } catch { /* logged out either way */ }
+  state.user = null;
+  board.replaceChildren();
+  showAuth();
+};
+
+// ---------- board events ----------
 let timer;
 $("#search").addEventListener("input", (e) => {
   clearTimeout(timer);
   timer = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 200);   // debounce
 });
 $("#sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
-document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => {
-  document.querySelector(".chip.active").classList.remove("active");
+document.querySelectorAll(".filters .chip").forEach((c) => c.addEventListener("click", () => {
+  document.querySelector(".filters .chip.active").classList.remove("active");
   c.classList.add("active");
   state.type = c.dataset.type;
   render();
@@ -135,8 +245,28 @@ form.addEventListener("submit", async (e) => {
     dialog.close();
     render();
   } catch (err) {
-    $("#formError").textContent = err.message;
+    if (!handleError(err)) $("#formError").textContent = err.message;
   }
 });
 
-render();
+// Shown when the page cannot reach the server at all (for example, index.html opened as a file).
+function showDown() {
+  $("#authView").hidden = true;
+  $("#headerApp").hidden = true;
+  $("#appView").hidden = true;
+  $("#downView").hidden = false;
+}
+
+// ---------- start ----------
+// Ask the server who we are. 401 = show login. No answer at all = server not running.
+async function start() {
+  try {
+    state.user = await api("/me");
+    showApp();
+  } catch (err) {
+    if (err.status === 0) showDown();
+    else showAuth(err.status === 401 ? "" : err.message);
+  }
+}
+$("#retry").onclick = start;
+start();

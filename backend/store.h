@@ -7,11 +7,17 @@
 #include "hashtable.h"
 #include "trie.h"
 #include "heap.h"
+#include "storage.h"
 
 class Store {
+public:
+    enum class Result { Ok, NotFound, Forbidden };
+
+private:
     HashTable table;
     Trie trie;
     int nextId = 1;
+    std::string path;   // JSON file the items are saved to; empty = keep in memory only
     // cpp-httplib runs handlers on a thread pool, so every public method
     // takes this lock before touching table, trie or nextId.
     std::mutex mtx;
@@ -21,15 +27,44 @@ class Store {
         return a.id > b.id;
     }
 
+    // Equal prices (e.g. every lend/lost/found notice is 0) fall back to newest first,
+    // so the order is always meaningful and the same on every request.
     static bool cheapestFirst(const Item& a, const Item& b) {
-        return a.price < b.price;
+        if (a.price != b.price) return a.price < b.price;
+        return newestFirst(a, b);
     }
 
     static bool dearestFirst(const Item& a, const Item& b) {
-        return a.price > b.price;
+        if (a.price != b.price) return a.price > b.price;
+        return newestFirst(a, b);
+    }
+
+    // Only the person who posted an item, or an admin, may close or delete it.
+    static bool mayChange(const Item& item, int userId, bool isAdmin) {
+        return isAdmin || item.ownerId == userId;
+    }
+
+    void saveLocked() {
+        if (path.empty()) return;
+        json list = json::array();
+        table.forEach([&](const Item& it) { list.push_back(itemToJson(it)); });
+        writeJsonFileAtomic(path, json{{"nextId", nextId}, {"items", list}});
     }
 
 public:
+    explicit Store(std::string file = "") : path(std::move(file)) {
+        if (path.empty()) return;
+        json data;
+        if (!readJsonFile(path, data)) return;
+        nextId = data.value("nextId", 1);
+        for (const json& j : data.at("items")) {
+            Item it = itemFromJson(j);
+            table.put(it);
+            trie.insert(it.title, it.id);
+            if (it.id >= nextId) nextId = it.id + 1;
+        }
+    }
+
     Item add(Item item) {
         std::lock_guard<std::mutex> lock(mtx);
         item.id = nextId++;
@@ -37,23 +72,31 @@ public:
         item.status = "open";
         table.put(item);
         trie.insert(item.title, item.id);
+        saveLocked();
         return item;
     }
 
-    bool close(int id) {
+    // The permission check happens inside the lock, together with the change,
+    // so nothing can modify the item between "may this user change it?" and the change itself.
+    Result close(int id, int userId, bool isAdmin) {
         std::lock_guard<std::mutex> lock(mtx);
         Item* item = table.get(id);
-        if (item == nullptr) return false;
+        if (item == nullptr) return Result::NotFound;
+        if (!mayChange(*item, userId, isAdmin)) return Result::Forbidden;
         item->status = "closed";
-        return true;
+        saveLocked();
+        return Result::Ok;
     }
 
-    bool remove(int id) {
+    Result remove(int id, int userId, bool isAdmin) {
         std::lock_guard<std::mutex> lock(mtx);
         Item* item = table.get(id);
-        if (item == nullptr) return false;
+        if (item == nullptr) return Result::NotFound;
+        if (!mayChange(*item, userId, isAdmin)) return Result::Forbidden;
         trie.erase(item->title, id);
-        return table.remove(id);
+        table.remove(id);
+        saveLocked();
+        return Result::Ok;
     }
 
     std::list<Item> query(const std::string& text, const std::string& type, const std::string& sort) {
