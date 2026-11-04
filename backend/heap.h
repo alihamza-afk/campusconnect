@@ -2,24 +2,25 @@
 #include <functional>
 #include <utility>
 
+// Class template: one Heap class works for any element type T.
 template <typename T>
-//classes and objects are used
 class Heap {
-    //pointer is used
+    // Raw pointer to a heap-allocated array that this class owns.
     T* arr;
     int n = 0;
     int cap;
     std::function<bool(const T&, const T&)> before;
 
     void grow() {
-        //uses dynamic memory allocation
+        // Dynamic memory allocation: double the capacity, copy, free the old array.
         T* bigger = new T[cap * 2];
         for (int i = 0; i < n; i++) bigger[i] = arr[i];
         delete[] arr;
         arr = bigger;
         cap = cap * 2;
     }
-//uses recursion
+    // Sift-up, written iteratively (a loop, not recursion): move arr[i]
+    // towards the root while it should come before its parent. O(log n).
     void up(int i) {
         while (i > 0) {
             int p = (i - 1) / 2;
@@ -29,6 +30,8 @@ class Heap {
         }
     }
 
+    // Sift-down, also iterative: swap arr[i] with whichever child should
+    // come first until neither child does. O(log n).
     void down(int i) {
         while (true) {
             int l = 2 * i + 1;
@@ -41,8 +44,8 @@ class Heap {
             i = best;
         }
     }
-//uses constructor and deconstructor
 public:
+    // Constructor allocates the array; destructor frees it (RAII).
     Heap(std::function<bool(const T&, const T&)> f, int startCap = 16) : cap(startCap), before(f) {
         arr = new T[cap];
     }
@@ -51,8 +54,9 @@ public:
         delete[] arr;
     }
 
+    // Copying is disabled (= delete). A default copy would duplicate the
+    // pointer, and both copies would later delete[] the same array.
     Heap(const Heap&) = delete;
-//uses operator overloading 
     Heap& operator=(const Heap&) = delete;
 
     bool empty() const {

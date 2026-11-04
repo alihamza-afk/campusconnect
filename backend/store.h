@@ -3,6 +3,7 @@
 #include <list>
 #include <string>
 #include <functional>
+#include <mutex>
 #include "hashtable.h"
 #include "trie.h"
 #include "heap.h"
@@ -11,6 +12,9 @@ class Store {
     HashTable table;
     Trie trie;
     int nextId = 1;
+    // cpp-httplib runs handlers on a thread pool, so every public method
+    // takes this lock before touching table, trie or nextId.
+    std::mutex mtx;
 
     static bool newestFirst(const Item& a, const Item& b) {
         if (a.createdAt != b.createdAt) return a.createdAt > b.createdAt;
@@ -27,6 +31,7 @@ class Store {
 
 public:
     Item add(Item item) {
+        std::lock_guard<std::mutex> lock(mtx);
         item.id = nextId++;
         item.createdAt = std::time(nullptr);
         item.status = "open";
@@ -36,6 +41,7 @@ public:
     }
 
     bool close(int id) {
+        std::lock_guard<std::mutex> lock(mtx);
         Item* item = table.get(id);
         if (item == nullptr) return false;
         item->status = "closed";
@@ -43,6 +49,7 @@ public:
     }
 
     bool remove(int id) {
+        std::lock_guard<std::mutex> lock(mtx);
         Item* item = table.get(id);
         if (item == nullptr) return false;
         trie.erase(item->title, id);
@@ -50,6 +57,7 @@ public:
     }
 
     std::list<Item> query(const std::string& text, const std::string& type, const std::string& sort) {
+        std::lock_guard<std::mutex> lock(mtx);
         bool searching = !text.empty();
         std::set<int> found;
         if (searching) found = trie.search(text);
