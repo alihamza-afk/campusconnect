@@ -1,7 +1,31 @@
 .idea/
 .DS_Store
+
+# Build output
+build/
 backend/campusconnect
+backend/campusconnect_asan
+backend/*.dSYM/
+tests/test_units
+
+# Third-party headers, downloaded by `make` (checksum-verified)
 backend/httplib.h
 backend/json.hpp
-# Saved items and accounts (password hashes). Never commit this.
+
+# Database and old Part 1 data: accounts and password hashes. Never commit this.
 backend/data/
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+
+# Local environment overrides
+.env
+
+# Local runtime database and data
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Temporary patch backups
+*.phase8-backup

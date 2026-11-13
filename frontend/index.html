@@ -18,7 +18,9 @@
       <div class="who">
         <span id="whoName"></span>
         <span id="whoRole" class="role-badge" hidden>Admin</span>
+        <button id="myClaims" class="btn ghost">My claims</button>
         <button id="logout" class="btn ghost">Log out</button>
+        <button id="logoutAll" class="btn ghost" title="Sign out on every device">Log out all</button>
       </div>
     </div>
   </header>
@@ -38,6 +40,7 @@
         <label>Password <input name="password" type="password" required autocomplete="current-password" maxlength="128"></label>
         <button type="submit" class="btn primary">Log in</button>
       </form>
+      <p class="auth-meta"><button type="button" id="forgotLink" class="linkish">Forgot password?</button></p>
 
       <form id="registerForm" class="auth-form" hidden>
         <label>Your name <input name="name" required autocomplete="name" maxlength="40"></label>
@@ -49,6 +52,7 @@
       </form>
 
       <p id="authError" class="error" role="alert"></p>
+      <p id="authNotice" class="notice" role="status"></p>
     </section>
   </main>
 
@@ -63,6 +67,10 @@
 
   <!-- Shown when logged in -->
   <div id="appView" hidden>
+    <p id="verifyBanner" class="verify-banner" hidden>
+      Your email is not verified yet, so posting is locked. Check your inbox, or
+      <button type="button" id="resendVerify" class="linkish">resend the link</button>.
+    </p>
     <nav class="filters" aria-label="Filter notices">
       <button class="chip active" data-type="">Everything</button>
       <button class="chip" data-type="sell">For sale</button>
@@ -80,6 +88,7 @@
 
     <p id="status" class="status" role="status"></p>
     <main id="board" class="board"></main>
+    <button type="button" id="loadMore" class="btn" hidden>Load more notices</button>
   </div>
 
   <dialog id="postDialog">
@@ -105,6 +114,14 @@
         <label id="priceField">Price (₹) <input name="price" type="number" min="0" max="1000000" value="0"></label>
       </div>
       <label>Where on campus <input name="location" maxlength="60" placeholder="Library, Hostel C, Canteen…"></label>
+      <div id="claimFields" hidden>
+        <label>Private detail only the real owner would know
+          <input name="proof" maxlength="120" placeholder="e.g. a cat sticker on the base">
+        </label>
+        <label>Contact to share after approval
+          <input name="contact" maxlength="100" placeholder="phone or hostel room">
+        </label>
+      </div>
       <p class="hint">Posted as <strong id="postAs"></strong>. Don't include phone numbers or ID numbers.</p>
       <p id="formError" class="error" role="alert"></p>
       <div class="actions">
@@ -112,6 +129,73 @@
         <button type="submit" class="btn primary">Pin to board</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="forgotDialog">
+    <form id="forgotForm">
+      <h2>Reset your password</h2>
+      <p class="auth-lead">Enter your college email and we will send a reset link.</p>
+      <label>College email <input name="email" type="email" required maxlength="100" autocomplete="username"></label>
+      <p id="forgotError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="cancelForgot" class="btn">Cancel</button>
+        <button type="submit" class="btn primary">Send link</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="resetDialog">
+    <form id="resetForm">
+      <h2>Choose a new password</h2>
+      <label>New password <input name="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></label>
+      <label>Confirm password <input name="confirm" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></label>
+      <p id="resetError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="cancelReset" class="btn">Cancel</button>
+        <button type="submit" class="btn primary">Change password</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="claimDialog">
+    <form id="claimForm">
+      <h2>Claim this notice</h2>
+      <p class="auth-lead" id="claimItemTitle"></p>
+      <label>Answer the private question
+        <textarea name="answer" rows="2" required maxlength="200" placeholder="The detail only the real owner would know"></textarea>
+      </label>
+      <label>Message to the poster
+        <textarea name="message" rows="2" maxlength="200" placeholder="Where and how you found it"></textarea>
+      </label>
+      <label>How can they reach you?
+        <input name="contact" required maxlength="100" placeholder="phone or hostel room">
+      </label>
+      <p id="claimError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="cancelClaim" class="btn">Cancel</button>
+        <button type="submit" class="btn primary">Send claim</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="claimsDialog">
+    <div class="claims-panel">
+      <h2 id="claimsTitle">Claims</h2>
+      <div id="claimsList"></div>
+      <div class="actions">
+        <button type="button" id="closeClaims" class="btn">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="myClaimsDialog">
+    <div class="claims-panel">
+      <h2>My claims</h2>
+      <div id="myClaimsList"></div>
+      <div class="actions">
+        <button type="button" id="closeMyClaims" class="btn">Close</button>
+      </div>
+    </div>
   </dialog>
 
   <script src="app.js"></script>

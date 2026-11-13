@@ -1,4 +1,16 @@
 #pragma once
+// ---------------------------------------------------------------------------
+// heap.h - a binary heap that works for any element type.
+//
+// WHY THIS ONE STAYS IN A HEADER (there is no heap.cpp):
+// a template is not real code until it is used. When you write Heap<Item>, the
+// compiler has to generate that class and its member functions at that point,
+// which means it must be able to see the full definition. If the bodies lived in
+// heap.cpp, the compiler working on store.cpp would only see declarations, and
+// the linker would have no Heap<Item> instance to link against. Standard
+// practice: templates, and small inline functions, live in headers; everything
+// that is not a template lives in a .cpp file.
+// ---------------------------------------------------------------------------
 #include <functional>
 #include <utility>
 
@@ -61,6 +73,11 @@ public:
 
     bool empty() const {
         return n == 0;
+    }
+
+    // How many elements are currently in the heap (used for top-K capping).
+    int size() const {
+        return n;
     }
 
     void push(const T& x) {

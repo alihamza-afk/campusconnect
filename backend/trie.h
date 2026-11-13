@@ -1,107 +1,40 @@
 #pragma once
+// ---------------------------------------------------------------------------
+// trie.h - DECLARATIONS for the prefix tree over notice title words.
+//
+// Phase 7 refactor: tokenisation moved to text.h so the trie and the inverted
+// index agree on what a word is. The trie now also exposes prefix(cleanedWord)
+// so a caller (Store) can combine prefix matches with exact-word matches from
+// the inverted index.
+// ---------------------------------------------------------------------------
 #include <map>
 #include <set>
 #include <string>
-#include <sstream>
-#include <cctype>
 
 class Trie {
     struct Node {
-        std::map<char, Node*> kids;
-        std::set<int> ids;
+        std::map<char, Node*> kids;   // next character -> child node
+        std::set<int> ids;            // notice ids whose title passes through here
     };
 
-    static const int MAX_WORDS = 20;
     Node* root;
 
-    void freeNode(Node* node) {
-        for (auto& p : node->kids) freeNode(p.second);
-        delete node;
-    }
-
-    std::string clean(const std::string& w) const {
-        std::string res;
-        for (char c : w) {
-            if (std::isalnum((unsigned char)c)) res += (char)std::tolower((unsigned char)c);
-        }
-        return res;
-    }
-
-    int splitWords(const std::string& text, std::string words[]) const {
-        int count = 0;
-        std::istringstream in(text);
-        std::string w;
-        while (count < MAX_WORDS && in >> w) {
-            w = clean(w);
-            if (!w.empty()) {
-                words[count] = w;
-                count++;
-            }
-        }
-        return count;
-    }
+    void freeNode(Node* node);
 
 public:
-    Trie() {
-        root = new Node();
-    }
+    Trie();
+    ~Trie();
 
-    ~Trie() {
-        freeNode(root);
-    }
-
+    // Owns raw Node pointers: copying would double-free them.
     Trie(const Trie&) = delete;
     Trie& operator=(const Trie&) = delete;
 
-    void insert(const std::string& title, int id) {
-        std::string words[MAX_WORDS];
-        int count = splitWords(title, words);
-        for (int i = 0; i < count; i++) {
-            Node* cur = root;
-            for (char c : words[i]) {
-                if (cur->kids.count(c) == 0) cur->kids[c] = new Node();
-                cur = cur->kids[c];
-                cur->ids.insert(id);
-            }
-        }
-    }
+    void insert(const std::string& title, int id);
+    void erase(const std::string& title, int id);
 
-    void erase(const std::string& title, int id) {
-        std::string words[MAX_WORDS];
-        int count = splitWords(title, words);
-        for (int i = 0; i < count; i++) {
-            Node* cur = root;
-            for (char c : words[i]) {
-                if (cur->kids.count(c) == 0) break;
-                cur = cur->kids[c];
-                cur->ids.erase(id);
-            }
-        }
-    }
+    // Ids whose title has a word starting with this already-cleaned prefix.
+    std::set<int> prefix(const std::string& cleanedWord) const;
 
-    std::set<int> search(const std::string& query) const {
-        std::string words[MAX_WORDS];
-        int count = splitWords(query, words);
-        std::set<int> result;
-
-        for (int i = 0; i < count; i++) {
-            const Node* cur = root;
-            for (char c : words[i]) {
-                auto it = cur->kids.find(c);
-                if (it == cur->kids.end()) return std::set<int>();
-                cur = it->second;
-            }
-
-            if (i == 0) {
-                result = cur->ids;
-            } else {
-                std::set<int> common;
-                for (int id : result) {
-                    if (cur->ids.count(id)) common.insert(id);
-                }
-                result = common;
-            }
-        }
-        return result;
-    }
+    // Convenience: split the query into words, AND their prefix matches.
+    std::set<int> search(const std::string& query) const;
 };

@@ -1,0 +1,27 @@
+# CampusConnect behind Caddy - HTTPS without any application code.
+#
+# The C++ server keeps speaking HTTP on 127.0.0.1:8080. Caddy terminates TLS in
+# front of it. That is the standard production arrangement: the app does not need
+# to know about certificates, renewals, or HTTPS internals.
+#
+# LOCAL DEMO (no domain, no cost):
+#   brew install caddy
+#   sudo caddy trust     # one-time: installs Caddy's local CA in the trust store
+#   caddy run            # uses this file, listening on https://localhost
+#   # start the app with:
+#   CC_COOKIE_SECURE=1 CC_HSTS=1 CC_BASE_URL=https://localhost make run
+#
+# PRODUCTION (a real domain pointed at the machine, ports 80/443 reachable):
+#   comment out the localhost block and uncomment the domain block below.
+#   Caddy obtains and renews a free Let's Encrypt certificate automatically.
+#   Then run the app with CC_COOKIE_SECURE=1 CC_HSTS=1 CC_BASE_URL=https://your.domain
+
+localhost {
+	tls internal
+	reverse_proxy 127.0.0.1:8080
+}
+
+# your-college-project.example.edu {
+# 	encode gzip
+# 	reverse_proxy 127.0.0.1:8080
+# }
