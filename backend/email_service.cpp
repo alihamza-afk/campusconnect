@@ -39,6 +39,9 @@ EmailService::sendVerification(int userId, const std::string& email) {
 
     if (!mailer_.send(email, user->name,
                       "Verify your CampusConnect email", body)) {
+        // Do not leave a token behind when no verification email was queued.
+        // Otherwise the resend cooldown can block a user who received nothing.
+        tokens_.deleteToken(tokenHash);
         return SendResult::Failed;
     }
 
@@ -97,6 +100,8 @@ EmailService::sendPasswordReset(const std::string& email) {
 
     if (!mailer_.send(user->email, user->name,
                       "Reset your CampusConnect password", body)) {
+        // A failed delivery must not leave a reset token or trigger cooldown.
+        tokens_.deleteToken(tokenHash);
         return SendResult::Failed;
     }
 
