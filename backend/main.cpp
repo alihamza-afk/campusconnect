@@ -39,7 +39,7 @@ using json = nlohmann::json;
 //   CC_MAIL_MODE       console (prints emails, works offline) or brevo (sends them) (default: console)
 //   CC_BASE_URL        base URL used in emailed links, e.g. https://campus.example  (default: http://localhost:<port>)
 //   CC_BREVO_API_KEY   Brevo API key when CC_MAIL_MODE=brevo
-//   CC_MAIL_FROM / CC_MAIL_FROM_NAME   the sender address/name used in emails
+//   CC_MAIL_FROM / CC_MAIL_FROM_NAME   sender address/name; Brevo requires a verified sender address
 //   CC_TRUST_PROXY     set to 1 only when a reverse proxy you control forwards requests,
 //                      so X-Forwarded-For can be believed for the per-IP rate limits
 //   CC_HSTS            set to 1 when served over HTTPS, to send HSTS (never over plain HTTP)
