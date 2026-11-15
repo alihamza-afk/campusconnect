@@ -340,6 +340,14 @@ The original Part 2 plan is complete. Optional extras (not required):
 
 ---
 
+## Live demo
+
+**Try CampusConnect:** https://furnished-cds-interpretation-visiting.trycloudflare.com
+
+This demo is hosted on AWS EC2 and made public through a Cloudflare Quick Tunnel. Quick Tunnel URLs are temporary and can change when the tunnel is recreated. If the link stops working, the current URL must be read from the running tunnel and this README updated.
+
+---
+
 # AWS EC2 deployment and live email delivery
 
 CampusConnect has been deployed to an **AWS EC2 virtual machine** so it can be accessed over the internet instead of only running on a developer's laptop. This section records the deployment architecture and the production issues fixed while bringing the application online.
