@@ -113,7 +113,7 @@ the proxy, set `CC_TRUST_PROXY=1` so the per-IP rate limits see real client addr
 | `CC_MAIL_MODE` | `console` prints emails (offline demo); `brevo` sends real email | `console` |
 | `CC_BREVO_API_KEY` | Brevo API key when `CC_MAIL_MODE=brevo` | none |
 | `CC_BASE_URL` | Base URL used inside emailed links | `http://localhost:<port>` |
-| `CC_MAIL_FROM`, `CC_MAIL_FROM_NAME` | Sender identity in emails | local defaults |
+| `CC_MAIL_FROM`, `CC_MAIL_FROM_NAME` | Sender identity in emails. For Brevo, the sender address must be verified in Brevo or covered by an authenticated domain. | local defaults |
 | `CC_TRUST_PROXY` | Set to `1` only behind a proxy you control, so `X-Forwarded-For` is trusted for per-IP limits | off |
 | `CC_HSTS` | Set to `1` when served over HTTPS, to send Strict-Transport-Security | off |
 
@@ -442,4 +442,4 @@ sudo systemctl status campusconnect --no-pager
 
 Keep `/etc/campusconnect.env`, private keys, database files, backups, and generated runtime data out of Git. Never paste API keys or server credentials into source files, commits, issues, or public documentation.
 
-For a more detailed first-time setup, see [AWS EC2 deployment guide](docs/AWS-DEPLOYMENT.md) when that guide is added to the repository.
+For the full first-time setup and maintenance instructions, see the [AWS EC2 deployment guide](docs/AWS-DEPLOYMENT.md).
