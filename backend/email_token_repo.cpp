@@ -58,6 +58,13 @@ bool EmailTokenRepo::recentlyIssued(int userId, const std::string& kind, long lo
     return s.step();
 }
 
+int EmailTokenRepo::deleteToken(const std::string& tokenHash) {
+    Statement s = db_.prepare("DELETE FROM email_tokens WHERE token_hash = ?");
+    s.bind(1, tokenHash);
+    s.run();
+    return db_.changes();
+}
+
 int EmailTokenRepo::deleteAllForUser(int userId) {
     Statement s = db_.prepare("DELETE FROM email_tokens WHERE user_id = ?");
     s.bind(1, userId);
