@@ -36,6 +36,9 @@ public:
     // Used for the resend cooldown.
     bool recentlyIssued(int userId, const std::string& kind, long long since);
 
+    // Remove one newly issued token when its email could not be delivered.
+    int deleteToken(const std::string& tokenHash);
+
     int deleteAllForUser(int userId);
     int pruneExpired(long long now);
 };
