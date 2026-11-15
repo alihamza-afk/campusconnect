@@ -562,3 +562,14 @@ make asan            # clean under AddressSanitizer + UBSan
 - Search indexes titles only (as before); adding descriptions is one more `insert`/`erase`.
 - The trie's per-node `std::map<char, Node*>` is memory-heavy compared with a sorted array
   of children or a ternary search tree; fine at this scale, and a good viva discussion.
+
+
+## AWS EC2 deployment and live email delivery follow-up
+
+The project is now documented as an AWS EC2-hosted demo. The deployment notes cover the Ubuntu EC2 host, systemd-managed application process, Cloudflare Quick Tunnel, SQLite data persistence, backups, and operational security.
+
+The live Brevo configuration required an explicit verified sender address through `CC_MAIL_FROM`. The development sender fallback ending in `.local` is not accepted for real Brevo delivery. Keep the Brevo API key and actual sender value in the private EC2 environment file, never in source control.
+
+Email delivery failure handling was also tightened: when verification or password-reset mail cannot be queued, the newly created token is deleted. This avoids leaving an unusable token that triggers the one-minute resend cooldown. The token repository exposes `deleteToken` for this targeted cleanup.
+
+See [AWS EC2 deployment guide](AWS-DEPLOYMENT.md) for setup and maintenance instructions. The live demo link is maintained near the top of the repository README.
