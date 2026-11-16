@@ -146,7 +146,7 @@ static void testRepositories() {
     Database db(":memory:");
     migrate(db);
     CHECK(db.userVersion() == SCHEMA_VERSION);
-    CHECK(db.userVersion() == 6);
+    CHECK(db.userVersion() == SCHEMA_VERSION);
 
     UserRepo users(db);
     ItemRepo items(db);
@@ -393,7 +393,7 @@ static void testAuth() {
 static void testSessions() {
     Database db(":memory:");
     migrate(db);
-    CHECK(db.userVersion() == 6);
+    CHECK(db.userVersion() == SCHEMA_VERSION);
 
     UserRepo users(db);
     SessionRepo sessions(db);
@@ -476,7 +476,7 @@ static void testSessions() {
     oldDb.exec("ALTER TABLE items DROP COLUMN image_mime");
     migrate(oldDb);
 
-    CHECK(oldDb.userVersion() == 6);
+    CHECK(oldDb.userVersion() == SCHEMA_VERSION);
     Statement tableCheck = oldDb.prepare(
         "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' "
         "AND name IN ('sessions','email_tokens','rate_limits','claims','notifications')");

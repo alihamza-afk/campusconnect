@@ -180,4 +180,35 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read
         tx.commit();
         db.setUserVersion(6);
     }
+
+    if (version < 7) {
+        Transaction tx(db);
+        db.exec(R"SQL(
+CREATE TABLE IF NOT EXISTS purchase_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    offered_price REAL NOT NULL CHECK (offered_price >= 0 AND offered_price <= 1000000),
+    message TEXT NOT NULL DEFAULT '',
+    buyer_contact TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'accepted', 'rejected')),
+    created_at INTEGER NOT NULL,
+    decided_at INTEGER,
+    decided_by INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_purchase_requests_item_status
+    ON purchase_requests(item_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_purchase_requests_buyer
+    ON purchase_requests(buyer_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_requests_one_pending
+    ON purchase_requests(item_id, buyer_id)
+    WHERE status = 'pending';
+)SQL");
+        tx.commit();
+        db.setUserVersion(7);
+    }
 }

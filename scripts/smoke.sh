@@ -462,7 +462,7 @@ check "non-admin cannot access admin stats" 403 "$code"
 # Admin user list.
 code=$(curl -s -o "$DATA8/admin_users" -w '%{http_code}' -b "$ADMIN_JAR" "$BASE/api/admin/users")
 check "admin user list returns 200" 200 "$code"
-cations: u3 posts, admin claims, u3 gets notification.
+# cations: u3 posts, admin claims, u3 gets notification.
 code=$(curl -s -o "$DATA8/notif_post" -w '%{http_code}' -b "$JAR3" -X POST "$BASE/api/items" \
        -H 'Content-Type: application/json' \
        -d '{"type":"lost","title":"Notification bottle","description":"notif","category":"Other","location":"Library","price":0,"proof":"secret","contact":"u3 contact"}')
@@ -492,7 +492,7 @@ check "notifications are now read" "True" \
       "$(python3 -c "import json;n=json.load(open('$DATA8/notifs2'));print(n[0]['read'])")"
 
 # Image upload.
-printf '\x89PNG\r\n\x1a\ndata' > "$DATA8/test.png"
+printf '\211PNG\r\n\032\ndata' > "$DATA8/test.png"
 code=$(curl -s -o "$DATA8/img_upload" -w '%{http_code}' -b "$JAR3" -X POST "$BASE/api/items/$NOTIF_ITEM_ID/image" \
        -H 'Content-Type: image/png' --data-binary "@$DATA8/test.png")
 check "image upload returns 200" 200 "$code"

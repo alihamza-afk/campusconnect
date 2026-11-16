@@ -118,6 +118,14 @@ function cardEl(item) {
       actions.append(claimsBtn);
     }
 
+    if (mine && item.type === "sell") {
+      const offersBtn = document.createElement("button");
+      offersBtn.className = "btn";
+      offersBtn.textContent = "Offers";
+      offersBtn.onclick = () => openOffers(item);
+      actions.append(offersBtn);
+    }
+
     if (!mine && state.user && state.user.role === "admin") {
       const note = document.createElement("span");
       note.className = "admin-note"; note.textContent = "as admin";
@@ -130,6 +138,17 @@ function cardEl(item) {
     claimBtn.textContent = item.type === "found" ? "This is mine" : "I found this";
     claimBtn.onclick = () => openClaim(item);
     el.append(claimBtn);
+  } else if (
+    item.type === "sell" &&
+    item.status === "open" &&
+    state.user &&
+    !mine
+  ) {
+    const buyBtn = document.createElement("button");
+    buyBtn.className = "btn";
+    buyBtn.textContent = "Buy / Make offer";
+    buyBtn.onclick = () => openPurchase(item);
+    el.append(buyBtn);
   }
   return el;
 }
@@ -190,6 +209,48 @@ async function render() {
 }
 
 $("#loadMore").onclick = () => loadPage();
+
+
+// ---------- purchase requests ----------
+const purchaseDialog = $("#purchaseDialog");
+const purchaseForm = $("#purchaseForm");
+let purchaseTarget = null;
+
+function openPurchase(item) {
+  purchaseTarget = item;
+  $("#purchaseTitle").textContent = `Make an offer: ${item.title}`;
+  purchaseForm.elements.offeredPrice.value = item.price || 0;
+  purchaseForm.elements.message.value = "";
+  purchaseForm.elements.buyerContact.value = "";
+  purchaseDialog.showModal();
+}
+
+$("#closePurchase").onclick = () => purchaseDialog.close();
+
+purchaseForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!purchaseTarget) return;
+
+  const body = {
+    offeredPrice: Number(purchaseForm.elements.offeredPrice.value),
+    message: purchaseForm.elements.message.value.trim(),
+    contact: purchaseForm.elements.buyerContact.value.trim()
+  };
+
+  try {
+    await api(`/items/${purchaseTarget.id}/purchase-requests`, {
+      method: "POST",
+      body
+    });
+    purchaseDialog.close();
+    purchaseTarget = null;
+    statusEl.textContent = "Your offer was sent to the seller.";
+    purchaseForm.reset();
+  } catch (err) {
+    if (handleError(err)) return;
+    statusEl.textContent = err.message;
+  }
+});
 
 // ---------- switching between the login screen and the board ----------
 function showAuth(message = "") {
@@ -286,20 +347,32 @@ form.elements.type.addEventListener("change", () => {
   $("#priceField").style.display = type === "sell" ? "" : "none";
   const claimable = type === "lost" || type === "found";
   $("#claimFields").hidden = !claimable;
+  $("#saleContactFields").hidden = type !== "sell";
+
   if (!claimable) {
     form.elements.proof.value = "";
     form.elements.contact.value = "";
+  }
+
+  if (type !== "sell") {
+    form.elements.saleContact.value = "";
   }
 });
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(form));
+  if (data.type === "sell") {
+    data.contact = data.saleContact || "";
+  }
+  delete data.saleContact;
   data.price = data.type === "sell" ? Number(data.price) || 0 : 0;
   try {
     await createItem(data);
     form.reset();
     $("#priceField").style.display = "";
+    $("#saleContactFields").hidden = true;
+    $("#claimFields").hidden = true;
     dialog.close();
     render();
   } catch (err) {
@@ -532,6 +605,163 @@ $("#myClaims").onclick = async () => {
   }
 };
 $("#closeMyClaims").onclick = () => myClaimsDialog.close();
+
+
+// ---------- purchase request views ----------
+
+function purchaseCard(request, isSeller = false, itemId = null) {
+  const el = document.createElement("article");
+  el.className = "claim-card";
+
+  const head = document.createElement("div");
+  head.className = "claim-head";
+
+  const title = document.createElement("strong");
+  title.textContent = isSeller
+    ? request.buyerName
+    : request.itemTitle;
+
+  const status = document.createElement("span");
+  status.className = `claim-status ${request.status}`;
+  status.textContent = request.status;
+
+  head.append(title, status);
+  el.append(head);
+
+  const price = document.createElement("p");
+  price.textContent = `Offer: ₹${request.offeredPrice}`;
+  el.append(price);
+
+  if (request.message) {
+    const message = document.createElement("p");
+    message.textContent = `Message: ${request.message}`;
+    el.append(message);
+  }
+
+  if (request.status === "accepted") {
+    const contactValue = isSeller
+      ? request.buyerContact
+      : request.sellerContact;
+
+    if (contactValue) {
+      const contact = document.createElement("p");
+      contact.textContent = `Contact: ${contactValue}`;
+      el.append(contact);
+    }
+  }
+
+  if (isSeller && request.status === "pending") {
+    const actions = document.createElement("div");
+    actions.className = "claim-actions";
+
+    const accept = document.createElement("button");
+    accept.className = "btn primary";
+    accept.textContent = "Accept";
+    accept.onclick = () => decidePurchase(itemId, request.id, true);
+
+    const reject = document.createElement("button");
+    reject.className = "btn danger";
+    reject.textContent = "Reject";
+    reject.onclick = () => decidePurchase(itemId, request.id, false);
+
+    actions.append(accept, reject);
+    el.append(actions);
+  }
+
+  return el;
+}
+
+async function loadPurchaseRequests() {
+  const requests = await api("/purchase-requests/mine");
+  const list = $("#purchaseRequestsList");
+  list.replaceChildren();
+
+  if (!requests.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "You have not made any offers yet.";
+    list.append(empty);
+  }
+
+  requests.forEach(request => list.append(purchaseCard(request)));
+  $("#purchaseRequestsDialog").showModal();
+}
+
+$("#myPurchaseRequests").onclick = async () => {
+  try {
+    await loadPurchaseRequests();
+  } catch (err) {
+    if (!handleError(err)) statusEl.textContent = err.message;
+  }
+};
+
+$("#closePurchaseRequests").onclick = () =>
+  $("#purchaseRequestsDialog").close();
+
+async function openOffers(item) {
+  try {
+    $("#offersTitle").textContent = `Offers for "${item.title}"`;
+    const requests = await api(`/items/${item.id}/purchase-requests`);
+    const list = $("#offersList");
+    list.replaceChildren();
+
+    if (!requests.length) {
+      const empty = document.createElement("p");
+      empty.textContent = "No offers received yet.";
+      list.append(empty);
+    }
+
+    requests.forEach(request =>
+      list.append(purchaseCard(request, true, item.id))
+    );
+
+    $("#offersDialog").showModal();
+  } catch (err) {
+    if (!handleError(err)) statusEl.textContent = err.message;
+  }
+}
+
+async function decidePurchase(itemId, requestId, accept) {
+  try {
+    await api(`/items/${itemId}/purchase-requests/${requestId}/decide`, {
+      method: "POST",
+      body: { accept }
+    });
+
+    await openOffers(state.items.find(item => item.id === itemId));
+    await render();
+  } catch (err) {
+    if (!handleError(err)) statusEl.textContent = err.message;
+  }
+}
+
+$("#myOffers").onclick = () => {
+  const ownSales = state.items.filter(item =>
+    item.type === "sell" &&
+    item.ownerId === state.user?.id
+  );
+
+  const list = $("#offersList");
+  list.replaceChildren();
+
+  if (!ownSales.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No sale listings are currently loaded.";
+    list.append(empty);
+  }
+
+  ownSales.forEach(item => {
+    const button = document.createElement("button");
+    button.className = "btn";
+    button.textContent = `View offers: ${item.title}`;
+    button.onclick = () => openOffers(item);
+    list.append(button);
+  });
+
+  $("#offersTitle").textContent = "Your sale listings";
+  $("#offersDialog").showModal();
+};
+
+$("#closeOffers").onclick = () => $("#offersDialog").close();
 
 // ---------- start ----------
 // Ask the server who we are. 401 = show login. No answer at all = server not running.

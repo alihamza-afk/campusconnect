@@ -9,7 +9,7 @@
 
 // Bump this whenever the schema changes, and add a matching "if (version < N)"
 // block in migrate() in schema.cpp.
-inline constexpr int SCHEMA_VERSION = 6;
+inline constexpr int SCHEMA_VERSION = 7;
 
 // Creates or upgrades the tables to SCHEMA_VERSION. Safe to call on every start:
 // with a current database it does nothing.

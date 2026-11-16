@@ -42,6 +42,7 @@ SRCS := backend/main.cpp \
         backend/email_service.cpp \
         backend/rate_limiter.cpp \
         backend/claim_repo.cpp \
+        backend/purchase_request_repo.cpp \
         backend/text.cpp \
         backend/inverted_index.cpp \
         backend/session_repo.cpp \

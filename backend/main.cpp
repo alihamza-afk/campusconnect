@@ -11,6 +11,7 @@
 
 #include "auth.h"
 #include "claim_repo.h"
+#include "purchase_request_repo.h"
 #include "db.h"
 #include "email_service.h"
 #include "email_token_repo.h"
@@ -152,11 +153,13 @@ std::string validateItem(Item& item) {
     if (item.title.empty() || utf8Length(item.title) > 60) return "title must be 1 to 60 characters";
     if (utf8Length(item.description) > 200) return "details must be at most 200 characters";
     if (utf8Length(item.location) > 60) return "location must be at most 60 characters";
-    // The private claim fields only make sense for lost & found notices.
+    // Keep private contact details for lost/found and sale listings.
     item.proof = trim(item.proof);
     item.contact = trim(item.contact);
     if (item.type != "lost" && item.type != "found") {
         item.proof.clear();
+    }
+    if (item.type == "lend") {
         item.contact.clear();
     }
     if (utf8Length(item.proof) > 120) return "the private detail must be at most 120 characters";
@@ -208,6 +211,7 @@ int main() {
     UserRepo userRepo(db);
     ItemRepo itemRepo(db);
     ClaimRepo claimRepo(db);
+    PurchaseRequestRepo purchaseRequestRepo(db);
     RateLimiter rateLimiter(db);
     SessionRepo sessionRepo(db);
     EmailTokenRepo emailTokenRepo(db);
@@ -738,6 +742,148 @@ int main() {
                                 {"ownerName", claim.ownerName},
                                 {"ownerContact", claim.ownerContact},
                                 {"createdAt", claim.createdAt}});
+        }
+        reply(res, 200, list);
+    });
+
+
+    // ---------- Purchase requests for sale listings ----------
+    // Buyers can submit offers only on another user's open sale listing.
+    server.Post(R"(/api/items/(\d+)/purchase-requests)", [&](const httplib::Request& req, httplib::Response& res) {
+        User user;
+        if (!requireUser(req, res, user)) return;
+        if (user.emailVerifiedAt == 0) return replyError(res, 403, "verify your email address first");
+
+        const int itemId = parseId(req.matches[1]);
+        std::optional<Item> item = store.find(itemId);
+        if (!item) return replyError(res, 404, "not found");
+        if (item->type != "sell") return replyError(res, 400, "offers are only available on sale listings");
+        if (item->status != "open") return replyError(res, 400, "this listing is already closed");
+        if (item->ownerId == user.id) return replyError(res, 400, "you cannot make an offer on your own listing");
+
+        json body;
+        if (!parseBody(req, res, body)) return;
+
+        auto price = body.find("offeredPrice");
+        if (price == body.end() || !price->is_number()) {
+            return replyError(res, 400, "enter a valid offer amount");
+        }
+        const double offeredPrice = price->get<double>();
+        if (!std::isfinite(offeredPrice) || offeredPrice < 0 || offeredPrice > 1000000) {
+            return replyError(res, 400, "offer must be between 0 and 1000000");
+        }
+
+        const std::string message = trim(str(body, "message"));
+        const std::string contact = trim(str(body, "contact"));
+        if (utf8Length(message) > 200) return replyError(res, 400, "message must be at most 200 characters");
+        if (contact.empty() || utf8Length(contact) > 100) {
+            return replyError(res, 400, "contact must be 1 to 100 characters");
+        }
+
+        const int requestId = purchaseRequestRepo.create(itemId, user.id, offeredPrice, message, contact);
+        if (requestId < 0) return replyError(res, 409, "you already have a pending offer on this listing");
+
+        notifRepo.create(item->ownerId, "purchase_offer", itemId,
+                         user.name + " sent an offer for \"" + item->title + "\"");
+        reply(res, 201, json{{"id", requestId}});
+    });
+
+    // Only the listing owner can view offers. Contact details are withheld until acceptance.
+    server.Get(R"(/api/items/(\d+)/purchase-requests)", [&](const httplib::Request& req, httplib::Response& res) {
+        User user;
+        if (!requireUser(req, res, user)) return;
+
+        const int itemId = parseId(req.matches[1]);
+        std::optional<Item> item = store.find(itemId);
+        if (!item) return replyError(res, 404, "not found");
+        if (item->type != "sell") return replyError(res, 400, "this is not a sale listing");
+        if (item->ownerId != user.id) {
+            return replyError(res, 403, "only the listing owner can view offers");
+        }
+
+        json list = json::array();
+        for (const PurchaseRequest& r : purchaseRequestRepo.listForSeller(itemId)) {
+            json entry = {
+                {"id", r.id}, {"itemId", r.itemId}, {"buyerName", r.buyerName},
+                {"offeredPrice", r.offeredPrice}, {"message", r.message},
+                {"status", r.status}, {"createdAt", r.createdAt},
+                {"decidedAt", r.decidedAt}
+            };
+            if (r.status == "accepted") entry["buyerContact"] = r.buyerContact;
+            list.push_back(entry);
+        }
+        reply(res, 200, list);
+    });
+
+    // Only the listing owner can accept or reject an offer.
+    server.Post(R"(/api/items/(\d+)/purchase-requests/(\d+)/decide)", [&](const httplib::Request& req, httplib::Response& res) {
+        User user;
+        if (!requireUser(req, res, user)) return;
+
+        const int itemId = parseId(req.matches[1]);
+        const int requestId = parseId(req.matches[2]);
+        std::optional<Item> item = store.find(itemId);
+        if (!item) return replyError(res, 404, "not found");
+        if (item->type != "sell") return replyError(res, 400, "this is not a sale listing");
+        if (item->ownerId != user.id) {
+            return replyError(res, 403, "only the listing owner can decide offers");
+        }
+
+        json body;
+        if (!parseBody(req, res, body)) return;
+        auto acceptValue = body.find("accept");
+        if (acceptValue == body.end() || !acceptValue->is_boolean()) {
+            return replyError(res, 400, "accept must be true or false");
+        }
+        const bool accept = acceptValue->get<bool>();
+
+        int buyerId = 0;
+        for (const PurchaseRequest& r : purchaseRequestRepo.listForSeller(itemId)) {
+            if (r.id == requestId) {
+                buyerId = r.buyerId;
+                break;
+            }
+        }
+
+        PurchaseDecisionResult result =
+            purchaseRequestRepo.decide(itemId, requestId, user.id, accept, std::time(nullptr));
+        if (result.status == PurchaseDecisionResult::Status::NotFound) {
+            return replyError(res, 409, "this offer was already decided or the listing is closed");
+        }
+
+        if (accept) {
+            store.markClosed(itemId);
+            if (buyerId != 0) {
+                notifRepo.create(buyerId, "purchase_accepted", itemId,
+                                 "Your offer for \"" + item->title + "\" was accepted");
+            }
+            for (int rejectedBuyerId : result.rejectedBuyerIds) {
+                notifRepo.create(rejectedBuyerId, "purchase_offer_closed", itemId,
+                                 "Another offer was accepted for \"" + item->title + "\"");
+            }
+        } else if (buyerId != 0) {
+            notifRepo.create(buyerId, "purchase_rejected", itemId,
+                             "Your offer for \"" + item->title + "\" was rejected");
+        }
+
+        reply(res, 200, json{{"ok", true}, {"accepted", accept}});
+    });
+
+    // Buyers see the seller's contact only after their offer is accepted.
+    server.Get("/api/purchase-requests/mine", [&](const httplib::Request& req, httplib::Response& res) {
+        User user;
+        if (!requireUser(req, res, user)) return;
+
+        json list = json::array();
+        for (const PurchaseRequest& r : purchaseRequestRepo.listForBuyer(user.id)) {
+            json entry = {
+                {"id", r.id}, {"itemId", r.itemId}, {"itemTitle", r.itemTitle},
+                {"offeredPrice", r.offeredPrice}, {"message", r.message},
+                {"status", r.status}, {"createdAt", r.createdAt},
+                {"decidedAt", r.decidedAt}
+            };
+            if (r.status == "accepted") entry["sellerContact"] = r.sellerContact;
+            list.push_back(entry);
         }
         reply(res, 200, list);
     });
