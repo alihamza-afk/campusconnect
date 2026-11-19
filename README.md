@@ -1,11 +1,55 @@
-# CampusConnect (Part 1 + Part 2)
+# CampusConnect
 
-A campus noticeboard for selling, lending, and lost & found items.
-Frontend: HTML, CSS, JavaScript. Backend: C++17 with hand-written DSA, plus a SQLite database.
+CampusConnect is a full-stack campus marketplace and lost-and-found platform built as a student portfolio project. It gives verified students a focused place to list items for sale, lend or borrow essentials, and recover lost property—with privacy and ownership controls handled on the server.
 
-Part 1 is the working product: accounts with roles, notices, search, sorting, moderation.
-Part 2 adds accountability and safety: sessions, email verification, rate limiting, HTTPS and
-claim verification are all done (Phases 2-6). What remains is the DSA upgrade list at the end.
+## Highlights
+
+- Create and manage sale, lending, lost, and found notices with search, filters, sorting, and pagination.
+- Submit and decide purchase offers for sale listings; contact information is revealed only after an accepted offer.
+- Use a private proof-and-claim flow for lost-and-found notices.
+- Keep accounts safer with Argon2id password hashing, server-side sessions, email verification, password reset, rate limiting, and role-based moderation.
+- Receive in-app notifications for relevant marketplace and claim activity.
+- Persist data in SQLite with migrations, transactions, prepared statements, and in-memory search indexes.
+- Run locally, in Docker, or behind Caddy for HTTPS; optional Brevo delivery supports real email.
+
+## Tech stack
+
+- **Frontend:** HTML, CSS, and vanilla JavaScript
+- **Backend:** C++17 with a hand-built HTTP API
+- **Data:** SQLite, plus custom hash table, trie, inverted index, and heap-based pagination
+- **Security & delivery:** libsodium (Argon2id), libcurl, Caddy, and optional Brevo email
+
+## Quick start
+
+1. Install the native dependencies:
+
+   `brew install libsodium sqlite3 curl`
+
+2. Build the app. The required single-header HTTP and JSON libraries are fetched and checksum-verified automatically:
+
+   ```bash
+   make
+   ```
+
+3. Start the app, creating the first admin account on first run:
+
+   ```bash
+   CC_ADMIN_EMAIL=admin@geu.ac.in CC_ADMIN_NAME="Lost & Found Desk" \\
+   CC_ADMIN_PASSWORD='choose-a-long-password' make run
+   ```
+
+4. Visit [http://localhost:8080](http://localhost:8080). Always use the running server rather than opening `index.html` directly.
+
+For a containerized run, use the Docker command in the [Run](#run) section below.
+
+## Documentation
+
+- [Change notes](docs/CHANGES.md) — implementation history and design decisions.
+- [Study topics](docs/STUDY-TOPICS.md) — concise viva preparation notes.
+- [AWS EC2 deployment guide](docs/AWS-DEPLOYMENT.md) — deployment and maintenance reference.
+- [Environment configuration](.env.example) — all supported runtime settings.
+
+> **Demo availability:** CampusConnect does not publish a permanent hosted demo URL. Cloudflare Quick Tunnel addresses are temporary and should be treated only as session-specific deployment output, not as a stable portfolio link.
 
 ## What changed in this revision (Phases 0-7 + header/source split)
 
@@ -330,21 +374,15 @@ Done: sessions in SQLite (Phase 2), email verification and password reset (Phase
 database-backed rate limiting per account and per network (Phase 4), HTTPS deployment with
 Caddy (Phase 5), claim verification for lost & found (Phase 6), DSA upgrades (Phase 7).
 
-The original Part 2 plan is complete. Optional extras (not required):
+The original Part 2 plan is complete. The app has since added purchase offers, in-app notifications, an admin workflow, and background email delivery.
 
-1. Admin dashboard for disputes and stats.
-2. In-app notifications / an SSE live board.
-3. A background queue for sending email.
-4. Item images, keyset pagination.
+Potential next steps are deliberately limited to product refinements:
+
+1. An SSE-powered live board.
+2. Keyset pagination for very deep result pages.
+3. More complete dispute and analytics views for administrators.
 
 
----
-
-## Live demo
-
-**Try CampusConnect:** https://furnished-cds-interpretation-visiting.trycloudflare.com
-
-This demo is hosted on AWS EC2 and made public through a Cloudflare Quick Tunnel. Quick Tunnel URLs are temporary and can change when the tunnel is recreated. If the link stops working, the current URL must be read from the running tunnel and this README updated.
 
 ---
 
